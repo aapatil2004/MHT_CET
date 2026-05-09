@@ -1,0 +1,77 @@
+# =========================
+# General
+# =========================
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# =========================
+# React FRONTEND
+# =========================
+
+# dependencies
+FRONTEND/node_modules/
+FRONTEND/cet-test-app/node_modules/
+
+# build output
+FRONTEND/cet-test-app/build/
+FRONTEND/cet-test-app/dist/
+
+# environment files
+FRONTEND/cet-test-app/.env
+FRONTEND/cet-test-app/.env.local
+FRONTEND/cet-test-app/.env.development.local
+FRONTEND/cet-test-app/.env.test.local
+FRONTEND/cet-test-app/.env.production.local
+
+# cache
+FRONTEND/cet-test-app/.cache/
+FRONTEND/cet-test-app/.eslintcache
+
+# =========================
+# FastAPI BACKEND
+# =========================
+
+# Python cache
+BACKEND/__pycache__/
+BACKEND/*.py[cod]
+
+# virtual environments
+BACKEND/venv/
+BACKEND/.venv/
+BACKEND/env/
+
+# environment variables
+BACKEND/.env
+
+# pytest cache
+BACKEND/.pytest_cache/
+
+# mypy cache
+BACKEND/.mypy_cache/
+
+# coverage
+BACKEND/htmlcov/
+BACKEND/.coverage
+
+# build artifacts
+BACKEND/dist/
+BACKEND/build/
+BACKEND/*.egg-info/
+
+# SQLite database (if local)
+BACKEND/*.db
+
+# =========================
+# Misc
+# =========================
+
+# temporary files
+*.swp
+*.swo
