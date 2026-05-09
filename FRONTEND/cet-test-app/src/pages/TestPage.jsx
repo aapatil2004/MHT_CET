@@ -31,6 +31,7 @@ function TestPage() {
   const [timeLeft, setTimeLeft] = useState(60);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const Navigate = useNavigate();
 
   // 🔌 Fetch questions
   useEffect(() => {
@@ -53,8 +54,10 @@ function TestPage() {
     if (submitted || loading) return;
 
     if (timeLeft <= 0) {
-      setSubmitted(true);
-      return;
+      Navigate("/result", {
+      state: { questions },
+    });
+    return;
     }
 
     const timer = setInterval(() => {
@@ -65,7 +68,6 @@ function TestPage() {
   }, [timeLeft, submitted, loading]);
 
   
-  const Navigate = useNavigate();
 
   const handleSubmit = () => {
     Navigate("/result", {
@@ -119,48 +121,6 @@ function TestPage() {
   if (loading) return <h3>Loading questions...</h3>;
 
   const currentQuestion = questions[currentIndex];
-
-  // 📊 RESULT PAGE
-  if (submitted) {
-    const score = calculateScore();
-
-    return (
-      <div style={{ padding: "20px" }}>
-        <h2>Test Submitted ✅</h2>
-        <h3>
-          Your Score: {score} / {questions.length}
-        </h3>
-
-        {questions.map((q, index) => (
-          <div key={q.id} style={{ marginBottom: "20px" }}>
-            <p>
-              <b>Q{index + 1}:</b>
-            </p>
-
-            <div
-              dangerouslySetInnerHTML={renderLatex(q.question)}
-            />
-
-            <p>
-              Your Answer:{" "}
-              <span
-                dangerouslySetInnerHTML={renderLatex(
-                  q.selected || "Not Attempted"
-                )}
-              />
-            </p>
-
-            <p>
-              Correct Answer:{" "}
-              <span
-                dangerouslySetInnerHTML={renderLatex(q.correct)}
-              />
-            </p>
-          </div>
-        ))}
-      </div>
-    );
-  }
 
   // 🧪 TEST PAGE
   return (
