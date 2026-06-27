@@ -2,13 +2,17 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import katex from "katex";
-import "katex/dist/katex.min.css";
 
-// 🔹 Render LaTeX safely
+import "katex/dist/katex.min.css";
+import "./TestPage.css";
+
+// =====================================
+// Render Latex
+// =====================================
 function renderLatex(text) {
   try {
     return {
-      __html: katex.renderToString(text, {
+      __html: katex.renderToString(text || "", {
         throwOnError: false,
       }),
     };
@@ -17,7 +21,9 @@ function renderLatex(text) {
   }
 }
 
-// 🔹 Status logic
+// =====================================
+// Get Status
+// =====================================
 function getStatus(q) {
   if (!q.selected && !q.markedForReview) return "NOT_ANSWERED";
   if (!q.selected && q.markedForReview) return "MARKED";
@@ -25,88 +31,176 @@ function getStatus(q) {
   if (q.selected && q.markedForReview) return "ANSWERED_MARKED";
 }
 
+// =====================================
+// Main Component
+// =====================================
 function TestPage() {
-  const [questions, setQuestions] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const Navigate = useNavigate();
 
-  // 🔌 Fetch questions
+  // =====================================
+  // States
+  // =====================================
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [currentSection, setCurrentSection] = useState("PC");
+
+  const [pcTimeLeft, setPcTimeLeft] = useState(10);
+  const [mathTimeLeft, setMathTimeLeft] = useState(2700);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const navigate = useNavigate();
+
+  // =====================================
+  // Fetch Questions
+  // =====================================
   useEffect(() => {
+
     axios
       .get("http://127.0.0.1:8000/questions")
+
       .then((res) => {
+
+        console.log("QUESTIONS:", res.data);
+
         const formatted = res.data.map((q) => ({
           ...q,
           selected: null,
           markedForReview: false,
         }));
+
         setQuestions(formatted);
       })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+
+      .catch((err) => {
+        console.error("FETCH ERROR:", err);
+      })
+
+      .finally(() => {
+        setLoading(false);
+      });
+
   }, []);
 
-  // ⏱️ Timer
-  useEffect(() => {
-    if (submitted || loading) return;
+  // =====================================
+  // Separate Questions
+  // =====================================
+  const pcQuestions = questions.filter((q) =>
+    ["physics", "chemistry"].includes(
+      q.subject?.toLowerCase()
+    )
+  );
 
-    if (timeLeft <= 0) {
-      Navigate("/result", {
-      state: { questions },
-    });
-    return;
+  const mathQuestions = questions.filter(
+    (q) =>
+      q.subject?.toLowerCase() === "mathematics"
+  );
+
+  const displayedQuestions =
+    currentSection === "PC"
+      ? pcQuestions
+      : mathQuestions;
+
+  const currentQuestion =
+    displayedQuestions[currentIndex];
+
+  // =====================================
+  // Timer Logic
+  // =====================================
+  useEffect(() => {
+
+    if (loading) return;
+
+    // ========================
+    // Physics + Chemistry
+    // ========================
+    if (currentSection === "PC") {
+
+      if (pcTimeLeft <= 0) {
+        setCurrentSection("MATH");
+        setCurrentIndex(0);
+        return;
+      }
+
+      const timer = setInterval(() => {
+        setPcTimeLeft((prev) => prev - 1);
+      }, 1000);
+
+      return () => clearInterval(timer);
     }
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
+    // ========================
+    // Mathematics
+    // ========================
+    if (currentSection === "MATH") {
 
-    return () => clearInterval(timer);
-  }, [timeLeft, submitted, loading]);
+      if (mathTimeLeft <= 0) {
+        navigate("/result", {
+          state: { questions },
+        });
+        return;
+      }
 
-  
+      const timer = setInterval(() => {
+        setMathTimeLeft((prev) => prev - 1);
+      }, 1000);
 
-  const handleSubmit = () => {
-    Navigate("/result", {
-      state: { questions },
-    })
-  };
+      return () => clearInterval(timer);
+    }
 
-  // 🧮 Score
-  const calculateScore = () => {
-    return questions.filter((q) => q.selected === q.correct).length;
-  };
+  }, [
+    currentSection,
+    pcTimeLeft,
+    mathTimeLeft,
+    loading,
+    navigate,
+    questions,
+  ]);
 
-  // ✅ Select option
+  // =====================================
+  // Option Click
+  // =====================================
   const handleOptionClick = (option) => {
-    if (submitted) return;
+
+    const id = currentQuestion.id;
 
     setQuestions((prev) =>
-      prev.map((q, index) =>
-        index === currentIndex ? { ...q, selected: option } : q
-      )
-    );
-  };
-
-  // 🔁 Toggle mark
-  const toggleMarkForReview = () => {
-    if (submitted) return;
-
-    setQuestions((prev) =>
-      prev.map((q, index) =>
-        index === currentIndex
-          ? { ...q, markedForReview: !q.markedForReview }
+      prev.map((q) =>
+        q.id === id
+          ? { ...q, selected: option }
           : q
       )
     );
   };
 
+  // =====================================
+  // Toggle Mark
+  // =====================================
+  const toggleMarkForReview = () => {
+
+    const id = currentQuestion.id;
+
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === id
+          ? {
+              ...q,
+              markedForReview:
+                !q.markedForReview,
+            }
+          : q
+      )
+    );
+  };
+
+  // =====================================
   // Navigation
+  // =====================================
   const nextQuestion = () => {
-    if (currentIndex < questions.length - 1) {
+    if (
+      currentIndex <
+      displayedQuestions.length - 1
+    ) {
       setCurrentIndex((prev) => prev + 1);
     }
   };
@@ -117,113 +211,344 @@ function TestPage() {
     }
   };
 
-  // ⏳ Loading
-  if (loading) return <h3>Loading questions...</h3>;
+  const jumpToQuestion = (index) => {
+    setCurrentIndex(index);
+  };
 
-  const currentQuestion = questions[currentIndex];
+  // =====================================
+  // Submit
+  // =====================================
+  const handleSubmit = () => {
 
-  // 🧪 TEST PAGE
-  return (
-    <div style={{ display: "flex", height: "100vh" }}>
-  
-  {/* LEFT SIDE */}
-  <div style={{ flex: 3, padding: "20px" }}>
-    <h3>⏱ Time Left: {timeLeft}s</h3>
+    navigate("/result", {
+      state: { questions },
+    });
+  };
 
-    <h2>Question {currentIndex + 1}</h2>
-
-    <div
-      style={{ marginBottom: "20px", fontSize: "18px" }}
-      dangerouslySetInnerHTML={renderLatex(currentQuestion.question)}
-    />
-
-    {/* Options */}
-    {currentQuestion.options.map((opt, index) => (
-      <button
-        key={index}
-        onClick={() => handleOptionClick(opt)}
+  // =====================================
+  // Loading
+  // =====================================
+  if (loading) {
+    return (
+      <div
         style={{
-          display: "block",
-          margin: "10px 0",
-          padding: "12px",
-          width: "100%",
-          textAlign: "left",
-          borderRadius: "8px",
-          border: "1px solid #ccc",
-          background:
-            currentQuestion.selected === opt ? "#d4edda" : "white",
-          cursor: "pointer",
+          height: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "24px",
         }}
       >
-        <span dangerouslySetInnerHTML={renderLatex(opt)} />
-      </button>
-    ))}
+        Loading Questions...
+      </div>
+    );
+  }
 
-    {/* Actions */}
-    <div style={{ marginTop: "20px" }}>
-      <button onClick={prevQuestion}>Back</button>
-      <button onClick={nextQuestion} style={{ marginLeft: "10px" }}>
-        Next
-      </button>
-      <button
-        onClick={toggleMarkForReview}
-        style={{ marginLeft: "10px" }}
+  // =====================================
+  // No Questions
+  // =====================================
+  if (!currentQuestion) {
+
+    return (
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "24px",
+          color: "red",
+        }}
       >
-        {currentQuestion.markedForReview
-          ? "Unmark"
-          : "Mark for Review"}
-      </button>
-    </div>
+        No Questions Found
+      </div>
+    );
+  }
 
-    <button
-      onClick={handleSubmit}
-      style={{ marginTop: "20px", background: "red", color: "white" }}
-    >
-      Submit Test
-    </button>
-  </div>
+  // =====================================
+  // Current Time
+  // =====================================
+  const currentTime =
+    currentSection === "PC"
+      ? pcTimeLeft
+      : mathTimeLeft;
 
-  {/* RIGHT SIDE (Palette) */}
-  <div
-    style={{
-      flex: 1,
-      borderLeft: "2px solid #eee",
-      padding: "20px",
-      background: "#f9f9f9",
-    }}
-  >
-    <h3>Questions</h3>
+  // =====================================
+  // UI
+  // =====================================
+  return (
 
-    {questions.map((q, index) => {
-      const status = getStatus(q);
+    <div className="test-container">
 
-      let color = "#ccc";
-      if (status === "ANSWERED") color = "#28a745";
-      if (status === "NOT_ANSWERED") color = "#dc3545";
-      if (status === "MARKED") color = "#ffc107";
-      if (status === "ANSWERED_MARKED") color = "#6f42c1";
+      {/* ========================= */}
+      {/* LEFT PANEL */}
+      {/* ========================= */}
+      <div>
 
-      return (
-        <button
-          key={q.id}
-          onClick={() => setCurrentIndex(index)}
+        {/* HEADING */}
+        <h2>
+          {currentSection === "PC"
+            ? "Physics + Chemistry"
+            : "Mathematics"}
+        </h2>
+
+        {/* TIMER */}
+        <div
           style={{
-            margin: "5px",
-            background: color,
+            marginBottom: "20px",
+            fontSize: "20px",
+            fontWeight: "bold",
+          }}
+        >
+          ⏱ Time Left:
+          {" "}
+          {Math.floor(currentTime / 60)}
+          :
+          {String(currentTime % 60).padStart(2, "0")}
+        </div>
+
+        {/* PROGRESS */}
+        <div style={{ marginBottom: "15px" }}>
+          Question {currentIndex + 1}
+          {" / "}
+          {displayedQuestions.length}
+        </div>
+
+        {/* STATUS */}
+        <div style={{ marginBottom: "20px" }}>
+          Status:
+          {" "}
+          {getStatus(currentQuestion)}
+        </div>
+
+        {/* ================================= */}
+        {/* IMAGE QUESTION */}
+        {/* ================================= */}
+        {currentQuestion.has_image &&
+          currentQuestion.image_url && (
+
+          <div style={{ marginBottom: "20px" }}>
+
+            <img
+              src={`http://127.0.0.1:8000${currentQuestion.image_url}`}
+              alt="Question"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "350px",
+                borderRadius: "10px",
+                border: "1px solid #ccc",
+              }}
+            />
+
+          </div>
+        )}
+
+        {/* ================================= */}
+        {/* QUESTION */}
+        {/* ================================= */}
+        {currentQuestion.question && (
+
+          <div
+            style={{
+              marginBottom: "20px",
+              padding: "15px",
+              background: "#fff",
+              borderRadius: "10px",
+              borderLeft: "4px solid #2563eb",
+              fontSize: "18px",
+            }}
+            dangerouslySetInnerHTML={renderLatex(
+              currentQuestion.question
+            )}
+          />
+
+        )}
+
+        {/* ================================= */}
+        {/* OPTIONS */}
+        {/* ================================= */}
+        <div>
+
+          {currentQuestion.options?.map(
+            (opt, index) => (
+
+              <button
+                key={index}
+
+                onClick={() =>
+                  handleOptionClick(opt)
+                }
+
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "15px",
+                  marginBottom: "12px",
+                  textAlign: "left",
+                  borderRadius: "8px",
+                  border:
+                    currentQuestion.selected === opt
+                      ? "2px solid green"
+                      : "1px solid #ccc",
+
+                  background:
+                    currentQuestion.selected === opt
+                      ? "#e8f5e9"
+                      : "white",
+
+                  cursor: "pointer",
+                }}
+              >
+
+                <strong>
+                  {String.fromCharCode(65 + index)}.
+                </strong>
+
+                {" "}
+
+                <span
+                  dangerouslySetInnerHTML={renderLatex(
+                    opt
+                  )}
+                />
+
+              </button>
+
+            )
+          )}
+
+        </div>
+
+        {/* ================================= */}
+        {/* NAVIGATION */}
+        {/* ================================= */}
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            marginTop: "20px",
+          }}
+        >
+
+          <button
+            onClick={prevQuestion}
+            disabled={currentIndex === 0}
+          >
+            Back
+          </button>
+
+          <button
+            onClick={nextQuestion}
+            disabled={
+              currentIndex ===
+              displayedQuestions.length - 1
+            }
+          >
+            Next
+          </button>
+
+          <button
+            onClick={toggleMarkForReview}
+          >
+            {currentQuestion.markedForReview
+              ? "Unmark"
+              : "Mark"}
+          </button>
+
+        </div>
+
+        {/* ================================= */}
+        {/* SUBMIT */}
+        {/* ================================= */}
+        <button
+          onClick={handleSubmit}
+          style={{
+            marginTop: "25px",
+            width: "100%",
+            padding: "15px",
+            background: "#ef4444",
             color: "white",
-            width: "40px",
-            height: "40px",
-            borderRadius: "5px",
             border: "none",
+            borderRadius: "8px",
+            fontWeight: "bold",
             cursor: "pointer",
           }}
         >
-          {index + 1}
+          Submit Test
         </button>
-      );
-    })}
-  </div>
-</div>
+
+      </div>
+
+      {/* ========================= */}
+      {/* RIGHT PANEL */}
+      {/* ========================= */}
+      <div>
+
+        <h3>Question Palette</h3>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+          }}
+        >
+
+          {displayedQuestions.map(
+            (q, index) => {
+
+              const status =
+                getStatus(q);
+
+              let bg = "#ccc";
+
+              if (status === "ANSWERED")
+                bg = "green";
+
+              if (status === "NOT_ANSWERED")
+                bg = "red";
+
+              if (status === "MARKED")
+                bg = "orange";
+
+              if (
+                status ===
+                "ANSWERED_MARKED"
+              )
+                bg = "purple";
+
+              return (
+
+                <button
+                  key={q.id}
+
+                  onClick={() =>
+                    jumpToQuestion(index)
+                  }
+
+                  style={{
+                    width: "45px",
+                    height: "45px",
+                    background: bg,
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  {index + 1}
+                </button>
+
+              );
+            }
+          )}
+
+        </div>
+
+      </div>
+
+    </div>
   );
 }
 
